@@ -7,6 +7,29 @@ from bootstrap import bootstrap_sample, bootstrap_ci, R_squared
 # -------------------------
 
 def test_bootstrap_integration():
+    """
+    Integration: bootstrap_sample → R_squared → bootstrap_ci.
+    This will initially fail until both R_squared and bootstrap_ci are implemented.
+    """
+    rng = np.random.default_rng(7)
+    n = 80
+    x = rng.normal(size=n)
+    X = np.c_[np.ones(n), x]          # intercept + x
+    beta = np.array([1.0, 2.0])
+    y = X @ beta + rng.normal(scale=0.4, size=n)
+
+    # 1) point estimate via R^2
+    point = R_squared(X, y)
+
+    # 2) bootstrap distribution of R^2 using bootstrap_sample
+    reps = bootstrap_sample(X, y, R_squared, n_bootstrap=200)
+
+    # 3) percentile CI from the bootstrap reps
+    low, high = bootstrap_ci(reps, ci=0.05)
+
+    # basic end-to-end assertions
+    assert reps.shape == (200,)
+    assert 0.0 <= low < high <= 1.0
 
 
 
