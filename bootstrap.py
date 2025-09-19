@@ -39,11 +39,18 @@ def bootstrap_sample(X, y, compute_stat, n_bootstrap=1000):
     X = np.asarray(X)
     y = np.asarray(y)
 
-    # Basic validation
+    if X.ndim != 2:
+        raise ValueError("X must be 2D.")
+    if y.ndim != 1:
+        raise ValueError("y must be 1D.")
     if X.shape[0] != y.shape[0]:
         raise ValueError("X and y must have the same number of rows")
-    if n_bootstrap <= 0:
+    if not isinstance(n_bootstrap, (int, np.integer)) or n_bootstrap <= 0:
         raise ValueError("n_bootstrap must be a positive integer")
+    if X.shape[0] == 0:
+        raise ValueError("X and y must be non-empty.")
+    if not callable(compute_stat):                
+        raise ValueError("compute_stat must be callable.")  
 
     n = X.shape[0]
     stats = np.empty(n_bootstrap, dtype=float)
