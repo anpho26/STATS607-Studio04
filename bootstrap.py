@@ -1,54 +1,77 @@
+import numpy as np
 
 """
 Strong linear model in regression
-    Y = X beta + eps, where eps~ N(0, sigma^2 I)
+    Y = X beta + eps, where eps ~ N(0, sigma^2 I)
     Under the null where beta_1 = ... = beta_p = 0,
-    the R-squared coefficient has a known distribution
-    (if you have an intercept beta_0), 
+    the R-squared coefficient has a known distribution.
+    If you include an intercept beta_0:
         R^2 ~ Beta(p/2, (n-p-1)/2)
 """
-import numpy as np
+
 
 def bootstrap_sample(X, y, compute_stat, n_bootstrap=1000):
     """
-    Generate bootstrap distribution of a statistic
+    Generate bootstrap distribution of a statistic by resampling (X, y) pairs.
 
     Parameters
     ----------
-    X : array-like, shape (n, p+1)
-        Design matrix
-    y : array-like, shape (n,)
+    X : array-like of shape (n, p+1)
+        Design matrix including intercept column.
+    y : array-like of shape (n,)
+        Response vector.
     compute_stat : callable
-        Function that computes a statistic (float) from data (X, y)
-    n_bootstrap : int, default 1000
-        Number of bootstrap samples to generate
+        Function that computes a statistic (float) from data (X, y).
+        It must have the signature `compute_stat(X, y) -> float`.
+    n_bootstrap : int, default=1000
+        Number of bootstrap resamples to generate.
 
     Returns
     -------
-    numpy.ndarray
-        Array of bootstrap statistics, length n_bootstrap
+    numpy.ndarray of shape (n_bootstrap,)
+        Bootstrap distribution of the statistic.
 
-    
-
-    ....
+    Raises
+    ------
+    ValueError
+        If X and y have incompatible shapes, or if n_bootstrap <= 0.
     """
-    pass
+    X = np.asarray(X)
+    y = np.asarray(y)
 
-def bootstrap_ci(bootstrap_stats, alpha=0.05):
+    # Basic validation
+    if X.shape[0] != y.shape[0]:
+        raise ValueError("X and y must have the same number of rows")
+    if n_bootstrap <= 0:
+        raise ValueError("n_bootstrap must be a positive integer")
+
+    n = X.shape[0]
+    stats = np.empty(n_bootstrap, dtype=float)
+
+    for i in range(n_bootstrap):
+        idx = np.random.randint(0, n, size=n)
+        X_resampled = X[idx]
+        y_resampled = y[idx]
+        stats[i] = compute_stat(X_resampled, y_resampled)
+
+    return stats
+
+
+def bootstrap_ci(bootstrap_stats, ci=0.95):
     """
-    Calculate confidence interval from the bootstrap samples
+    Calculate confidence interval from bootstrap statistics.
 
     Parameters
     ----------
     bootstrap_stats : array-like
-        Array of bootstrap statistics
-    alpha : float, default 0.05
-        Significance level (e.g. 0.05 gives 95% CI)
+        Array of bootstrap statistics.
+    ci : float, default 0.95
+        Confidence level in (0, 1).
 
     Returns
     -------
     tuple 
-        (lower_bound, upper_bound) of the CI
+        (lower_bound, upper_bound) of the CI.
     
     Raises
     ------
@@ -57,20 +80,20 @@ def bootstrap_ci(bootstrap_stats, alpha=0.05):
     """
     samp = np.asarray(bootstrap_stats, dtype=float)
 
-    # Validate inputs
     if samp.ndim != 1:
         raise ValueError("samples must be a 1D array.")
     if samp.size == 0:
         raise ValueError("samples cannot be empty.")
-    if not (0.0 < alpha < 1.0):
-        raise ValueError("alpha must be in the open interval (0, 1).")
+    if not (0.0 < ci < 1.0):
+        raise ValueError("ci must be in the open interval (0, 1).")
 
-    # Percentile bounds
+    alpha = 1.0 - ci
     lower_q = alpha / 2.0
     upper_q = 1.0 - alpha / 2.0
     low, high = np.quantile(samp, [lower_q, upper_q])
 
     return float(low), float(high)
+
 
 def R_squared(X, y):
     """
@@ -79,18 +102,19 @@ def R_squared(X, y):
     Parameters
     ----------
     X : array-like, shape (n, p+1)
-        Design matrix
+        Design matrix (with intercept column if needed).
     y : array-like, shape (n,)
+        Response vector.
 
     Returns
     -------
     float
-        R-squared value (between 0 and 1) from OLS
+        R-squared value (can be negative if the model is worse than mean-only).
     
     Raises
     ------
     ValueError
-        If X.shape[0] != len(y)
+        If inputs have incompatible shapes.
     """
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -105,7 +129,6 @@ def R_squared(X, y):
     if y.shape[0] != n:
         raise ValueError("X and y must have the same number of rows.")
 
-    # OLS via least squares (robust to singular X)
     beta, *_ = np.linalg.lstsq(X, y, rcond=None)
     y_hat = X @ beta
     resid = y - y_hat
@@ -114,10 +137,7 @@ def R_squared(X, y):
     y_bar = float(np.mean(y))
     sst = float(np.sum((y - y_bar) ** 2))
 
-    # If y is constant: define R^2 = 1 if perfect fit, else 0
     if sst == 0.0:
         return 1.0 if sse == 0.0 else 0.0
 
-    r2 = 1.0 - sse / sst
-    # Numerical guard to keep within [0, 1]
-    return float(min(1.0, max(0.0, r2)))
+    return float(1.0 - sse / sst)
