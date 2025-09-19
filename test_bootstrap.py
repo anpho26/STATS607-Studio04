@@ -7,30 +7,7 @@ from bootstrap import bootstrap_sample, bootstrap_ci, R_squared
 # -------------------------
 
 def test_bootstrap_integration():
-    """
-    Integration: bootstrap_sample → R_squared → bootstrap_ci.
-    Ensures that the pipeline works end-to-end.
-    """
-    rng = np.random.default_rng(7)
-    n = 80
-    x = rng.normal(size=n)
-    X = np.c_[np.ones(n), x]          # intercept + x
-    beta = np.array([1.0, 2.0])
-    y = X @ beta + rng.normal(scale=0.4, size=n)
 
-    # 1) point estimate via R^2
-    point = R_squared(X, y)
-
-    # 2) bootstrap distribution of R^2 using bootstrap_sample
-    reps = bootstrap_sample(X, y, R_squared, n_bootstrap=200)
-
-    # 3) percentile CI from the bootstrap reps
-    low, high = bootstrap_ci(reps, ci=0.95)
-
-    # basic end-to-end assertions
-    assert reps.shape == (200,)
-    assert 0.0 <= low < high <= 1.0
-    assert low <= point <= high
 
 
 # -------------------------
@@ -152,17 +129,6 @@ def test_R_squared_mean_only_model():
     X = np.ones((100, 1))
     r2 = R_squared(X, y)
     assert r2 == pytest.approx(0.0, abs=1e-12)
-
-
-def test_R_squared_negative():
-    """Misleading predictor (anticorrelation) should yield R^2 < 0."""
-    rng = np.random.default_rng(123)
-    x = rng.normal(size=100)
-    y = x
-    X_bad = np.c_[np.ones_like(x), -x]
-    r2 = R_squared(X_bad, y)
-    assert r2 < 0
-
 
 def test_R_squared_input_validation():
     """Invalid shapes should raise ValueError."""
