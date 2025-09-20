@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from bootstrap import bootstrap_sample, bootstrap_ci, R_squared
-
+from scipy.stats import beta, kstest
 # -------------------------
 # Integration test
 # -------------------------
@@ -166,3 +166,31 @@ def test_R_squared_input_validation():
 
     with pytest.raises(ValueError):
         R_squared(X[:4], y)  # mismatched lengths
+
+def test_R_squared_null_distribution_statistical_validation():
+    """
+    Bonus statistical validation:
+    Under the null hypothesis (beta_1 = ... = beta_p = 0),
+    the distribution of R^2 follows a Beta(p/2, (n-p-1)/2).
+    This test simulates R^2 under the null and checks the
+    distribution against the theoretical Beta law.
+    """
+    rng = np.random.default_rng(123)
+    n, p = 100, 2  # n samples, p predictors (excluding intercept)
+
+    # Simulate under null: true beta = 0 (only intercept)
+    X = rng.normal(size=(n, p))
+    X = np.c_[np.ones(n), X]  # add intercept
+    y = rng.normal(size=n)    # pure noise
+
+    # Bootstrap replicate R^2 many times
+    reps = np.array([R_squared(X, rng.normal(size=n)) for _ in range(2000)])
+
+    # Theoretical distribution parameters
+    a, b = p / 2, (n - p - 1) / 2
+
+    # KS test: compare empirical to Beta(a,b)
+    stat, pval = kstest(reps, 'beta', args=(a, b))
+
+    # Require non-extreme p-value (distributional match)
+    assert pval > 0.01, f"KS test failed: p-value={pval}"
